@@ -262,6 +262,7 @@ var returnNumberWithCommas = function returnNumberWithCommas(x) {
 var zoomToMuni = function zoomToMuni(selectedMuni) {
   // where clause
   var whereClause = "MUNI = '".concat(selectedMuni, "'");
+  
   var query = L.esri.query({
     url: 'https://services1.arcgis.com/1Cfo0re3un0w6a30/arcgis/rest/services/Municipal_Boundaries/FeatureServer/0'
   });
@@ -421,8 +422,39 @@ var roadsMunicipality = L.esri.tiledMapLayer({
 
 var landUseTypeArr = []
 var landUses = function(feature) {
+  landUseTypeArr.length = 0
   landUseTypeArr.push(feature.properties.LANDUSE)
+  planSubmissions.refresh();
 } 
+
+var landTypesObj = {
+  residential: 0,
+  commercial: 0,
+  industrial: 0,
+  agricultural: 0,
+  semiPublic: 0,
+  lotAddition: 0
+}
+
+var proposedNonResidentialSqaureFootage = {
+  commercial: 0,
+  industrial: 0,
+  agricultural: 0,
+  semiPublic: 0
+}
+
+var UnitTypeCounts = {
+  singleHouse: 0,
+  multiHouse: 0,
+  townHouse: 0
+}
+
+var nonResidentalLotsCreated = {
+  commercial: 0,
+  industrial: 0,
+  agricultural: 0,
+  semiPublic: 0
+}
 
 function countDistinct(arr,n)
 {
@@ -440,13 +472,13 @@ function countDistinct(arr,n)
 }
 
 var planSubmissions = L.esri.featureLayer({
-  url: 'https://gis.ccpa.net/arcgiswebadaptor/rest/services/Planning/Auto_Reviewed_SALDO_Plans_Public/MapServer/0',
+  url: 'https://gis.ccpa.net/arcgiswebadaptor/rest/services/Planning/SALDO_Growth_Trends/MapServer/0',
   where: initialWhereClause,
   onEachFeature: function onEachFeature(feature, layer) {
-    // console.log(convertJSONDateToString(feature.properties.DATE))
+    // push2Array(feature, layer, landUseTypeArr)
     // console.log(landUseTypeArr)
     // Pop-up control for small screen sizes
-    landUseTypeArr.push(feature.properties.LANDUSE)
+    // console.log(feature)
     if (windowArea < 315000) {
       // Hide leaflet controls when pop-up opens
       layer.on('popupopen', function () {
@@ -462,6 +494,95 @@ var planSubmissions = L.esri.featureLayer({
   },
   isLoaded: false
 }); // format popup for plan review featres
+
+
+// change switch desitnation after confirming with steve //
+function push2Array(feature, obj, array) {
+  switch (feature.properties.LANDUSE) {
+    case 1: 
+    obj['residential'] += 1;
+    
+    break;
+
+    case 2: 
+    obj['lotAddition'] += 1;
+    break;
+
+    case 3:
+    obj['commercial'] += 1;
+    break;
+
+    case 4:
+    obj['industrial'] += 1;
+    break;
+
+    // not sure why this works but it does don't change it //
+
+    case 5:
+    obj['agricultural'] += 1;
+    break;
+
+    // case 6:
+    // obj['semiPublic'] += 1;
+
+    // case 7:
+    // obj['semiPublic'] += 1;
+    // break;
+
+    default:
+    obj['semiPublic'] += 1;
+  }
+  array.push(feature.properties.LANDUSE)
+}
+
+function getUnitTypeCounts(feature, obj) {
+  // if statements eval to false if conditon is null or undefined (effectively skipping adding a null or undefined val to count bc JS is jank)
+  if (feature.properties.SingleFamily) {
+    obj['singleHouse'] += feature.properties.SingleFamily 
+  } if (feature.properties.MultiFamily) {
+    obj['multiHouse'] += feature.properties.MultiFamily
+  } if (feature.properties.Townhouses) {
+    obj['townHouse'] += feature.properties.Townhouses
+  }
+}
+
+function getNonResidentialLotsCreated(feature, obj) {
+
+  obj['commercial'] += feature.properties.Commercial
+  obj['industrial'] += feature.properties.Industrial
+  obj['agricultural'] += feature.properties.Agricultural
+  obj['semiPublic'] += feature.properties.Public_Semipublic
+
+}
+
+var count = 0
+
+planSubmissions.on('load', iterateFeatures);
+function iterateFeatures () {
+    Object.keys(landTypesObj).forEach((i) => landTypesObj[i] = 0);
+    Object.keys(UnitTypeCounts).forEach((i) => UnitTypeCounts[i] = 0);
+    Object.keys(nonResidentalLotsCreated).forEach((i) => nonResidentalLotsCreated[i] = 0);
+    console.log(landTypesObj)
+    count = 0
+    planSubmissions.eachActiveFeature(function(layer) {
+    count += 1
+    // console.log(layer.feature.properties);
+    push2Array(layer.feature, landTypesObj, landUseTypeArr)
+    getUnitTypeCounts(layer.feature, UnitTypeCounts)
+    getNonResidentialLotsCreated(layer.feature, nonResidentalLotsCreated)
+    // getTotalLandUseTypes(landUseTypeArr)
+    addData(barChartObj, Object.keys(landTypesObj).map(val => landTypesObj[val]))
+    updateDoughChart(doughCtx, Object.keys(UnitTypeCounts).map(val => UnitTypeCounts[val]))
+    updatePieChart(pieCtx, Object.keys(nonResidentalLotsCreated).map(val => nonResidentalLotsCreated[val]))
+    // console.log(layer.feature.properties.LANDUSE)
+    console.log(layer.feature.properties)
+    });
+    console.log(count)
+    console.log(landTypesObj)
+    console.log(Object.keys(landTypesObj).map(val => landTypesObj[val]))
+    console.log(UnitTypeCounts)
+    console.log(nonResidentalLotsCreated)
+}
 
 planSubmissions.bindPopup(function (evt, layer) {
   // reformat date field value
@@ -527,16 +648,42 @@ createMapLegend('https://gis.ccpa.net/arcgiswebadaptor/rest/services/Planning/Au
 // console.log(landUseTypeArr)
 // console.log(countDistinct(landUseTypeArr, landUseTypeArr.length))
 
-landUseTypeSum = [0, 0, 0, 0, 0, 0, 0, 0]
-let getSums = function() {
-  landUseTypeSum.length = 0;
-  landUseTypeSum = [0, 0, 0, 0, 0, 0, 0, 0]
-  
+
+// old - delete when finished with graphs //
+var landUseTallyObj = {}
+function getTotalLandUseTypes(array) {
+  for (var member in landUseTallyObj) delete landUseTallyObj[member]
+  // console.log(landUseTallyObj)
+  array.forEach((landTypeId) => {
+    if (landUseTallyObj[landTypeId]) {
+      landUseTallyObj[landTypeId]++;
+    } else {
+      landUseTallyObj[landTypeId] = 1;
+    }
+  })
 }
-planSubmissions.on('load', function() {
-  console.log(landUseTypeArr)
-  console.log(countDistinct(landUseTypeArr, landUseTypeArr.length))
-})
+
+// var chartArray = []
+// function buildBarChartArray(object) {
+//   chartArray.length = 0
+//   chartArray.push(object['1'], object['2'], object['3'], object['4'], object['5'])
+//   return chartArray
+// }
+
+function addData(chart, dataArr) {
+  chart.config.data.datasets[0].data = dataArr
+  chart.update();
+}
+
+function updateDoughChart(chart, dataArrDough) {
+  chart.config.data.datasets[0].data = dataArrDough
+  chart.update();
+}
+
+function updatePieChart(chart, dataArrPie) {
+  chart.config.data.datasets[0].data = dataArrPie
+  chart.update();
+}
 
 
 function clearFilter() {
@@ -556,50 +703,65 @@ function clearFilter() {
 // })
 
 function setFilter() {
-  // beginning date
-  var from = $('#fromDate').val(); // ending date
+ // beginning date
+ var from = $('#fromDate').val(); // ending date
+ var fromTime = `${from} 00:00:00`
 
-  var to = $('#toDate').val(); // where clause for filter
+ var to = $('#toDate').val(); // where clause for filter
+ var toTime = `${to} 23:59:59`
 
-  var where_clause = "DATE >= date '".concat(from, "' AND DATE <= date '").concat(to, "'"); // apply filter
+ var where_clause = "DATE >= date '".concat(fromTime, "' AND DATE <= date '").concat(toTime, "'"); // apply filter
+  // console.log(where_clause)
 
-  planSubmissions.setWhere(where_clause); // get count of features
+ planSubmissions.setWhere(where_clause); // get count of features
   // if no features exist, add message
   // call clearFilter()
   // reset UI widget
 
-  setFilterUIWidgetContent(from, to); // close modal
+ setFilterUIWidgetContent(from, to); // close modal
+  // console.log(from.split(' '), console.log(to.split(' ')))
 
-  $('#filterModal').modal('hide'); // refresh plan submissions layer on map
+ $('#filterModal').modal('hide'); // refresh plan submissions layer on map
 
-  planSubmissions.refresh();
+ planSubmissions.refresh();
 } // add event listeners
 
 
 $('#setFilter').click(setFilter);
-$('#clearFilter').click(clearFilter); // filter by selected year
+$('#clearFilter').click(clearFilter);
 
-$("#plansSelectedYear").on("change", function (e) {
+// filter by selected year
+$("#plansSelectedYear").on("change", function (e, array) {
   // user selected year
   var userYear = $(this).val(); // initial date for query
 
   var userStartDate = startDate + userYear; // end date for query
+  var userStartDateTime = `${userStartDate} 00:00:00`
 
   var userEndDate = endDate + userYear; // create definition query
+  var userEndDateTime = `${userEndDate} 23:59:59`
+  // console.log(userStartDate, userEndDate)
 
-  var userQuery = setDateQuery(userStartDate, userEndDate); // apply defitional query
+  var userQuery = setDateQuery(userStartDateTime, userEndDateTime); // apply defitional query
+   // apply defitional query
+  planSubmissions.setWhere(userQuery);
 
-  planSubmissions.setWhere(userQuery); // close panel
+   // close panel
+  $('#panelSelectByYearFilter').collapse("hide");
 
-  $('#panelSelectByYearFilter').collapse("hide"); // reset default value
+   // reset default value
+  resetDefaultOptionElement('plansSelectedYear');
 
-  resetDefaultOptionElement('plansSelectedYear'); // reset UI widget
+   // reset UI widget
+  setFilterUIWidgetContent(userStartDate, userEndDate);
 
-  setFilterUIWidgetContent(userStartDate, userEndDate); // close modal
-
-  $('#filterYearModal').modal('hide'); // refresh plan submissions layer on map
-
+   // close modal
+  $('#filterYearModal').modal('hide');
+   
+  // refresh plan submissions layer on map
   planSubmissions.refresh();
+
+  landUseTypeArr.length = 0
 }); // filter by start and end year
 
 $('#setFilterMultipleYears').on('click', function (e) {
@@ -609,10 +771,13 @@ $('#setFilterMultipleYears').on('click', function (e) {
   var filterEndYear = $('#plansEndYear').val(); // query from date
 
   var filterFromDate = startDate + filterStartYear; // query end date
+  var filterFromDateTime = `${filterFromDate} 00:00:00`
 
   var filterEndDate = endDate + filterEndYear; // construct defintion query
+  var filterEndDateTime = `${filterEndDate} 23:59:59`
 
-  var where_clause = setDateQuery(filterFromDate, filterEndDate); // apply query
+  var where_clause = setDateQuery(filterFromDateTime, filterEndDateTime); // apply query
+  console.log(where_clause)
 
   planSubmissions.setWhere(where_clause); // close panel
 
@@ -626,7 +791,11 @@ $('#setFilterMultipleYears').on('click', function (e) {
   $('#filterMultiYearModal').modal('hide'); // refresh plan submissions layer on map
 
   planSubmissions.refresh();
-}); // CCPA Composite Locatoer
+});
+
+
+
+// CCPA Composite Locatoer
 
 var ccpaProvider = L.esri.Geocoding.geocodeServiceProvider({
   label: 'Street Addresses',
@@ -713,57 +882,162 @@ var locateControl = L.control.locate({
 }).addTo(map);
 /*** Remove loading screen after services loaded ***/
 
-const ctx = document.getElementById('barChart');
 
-  new Chart(ctx, {
-    type: 'bar',
-    data: {
-      labels: ['Lot Addition', 'Public Semi-Public', 'Industrial', 'Commerical', 'Residential'],
-      datasets: [{
-        label: 'Plans By Land Use',
-        data: [12, 19, 3, 5, 2],
-        borderWidth: 1
-      }]
+// REMOVE AND ADD UPDATED CHARTJS CODE //
+
+const labels = ['Residential', 'Commercial', 'Industrial', 'Agricultural', 'Public Semi-Public', 'Lot Addition'];
+const data = {
+  labels: labels,
+  datasets: [{
+    data: [],
+    backgroundColor: [
+      'rgba(255, 255, 0, 1)',
+      'rgba(255, 0, 0, 1)',
+      'rgba(197, 0, 255, 1)',
+      'rgba(56, 168, 0, 1)',
+      'rgba(203,201,204, 1)',
+      'rgba(230, 152, 0, 1)',
+    ],
+    borderColor: [
+      'rgb(8, 6, 0)',
+      'rgb(8, 6, 0)',
+      'rgb(8, 6, 0)',
+      'rgb(8, 6, 0)',
+      'rgb(8, 6, 0)',
+      'rgb(8, 6, 0)',
+    ],
+    borderWidth: 1.5
+  }]
+};
+
+const config = {
+  type: 'bar',
+  data: data,
+  options: {
+    scales: {
+      pointLabels: {
+        fontStyle: 'bold'
+      }
     },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      scales: {
-        y: {
-          beginAtZero: true
-        }
+    plugins: {
+      title: {
+        display: true,
+        text: 'Plans By Land Use'
+      },
+      legend: {
+        display: false
+      }
+    },
+    responsive: true,
+    maintainAspectRatio: false,
+    tooltips: {
+      displayColors: false
+    },
+    scales: {
+      y: {
+        beginAtZero: true
       }
     }
-  });
+  },
+};
 
- const pieCtx = document.getElementById('pieChart')
- var xValues = ["Commerical", "Industrial", "Agricultural", "Public Semipublic"];
- var yValues = [55, 49, 44, 24];
- var barColors = ["red", "green","blue","orange"];
 
-  new Chart(pieCtx, {
-    type: "doughnut",
-    data: {
-      labels: xValues,
-      datasets: [{
-        backgroundColor: barColors,
-        data: yValues
-      }]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: {
-        title: {
-          display: true,
-          text: 'Non-residential Lots Created',
-        legend: {
-          display: true,
-          position: 'right'
-        }
+// const ctx = document.getElementById('barChart');
+var barChartObj = new Chart(document.getElementById('barChart'), config)
+
+//  var barChartObj = new Chart(ctx, {
+//     type: 'bar',
+//     data: {
+//       labels: ['Lot Addition', 'Public Semi-Public', 'Industrial', 'Commerical', 'Residential'],
+//       datasets: [{
+//         label: 'Plans By Land Use',
+//         data: [],
+//         borderWidth: 1
+//       }]
+//     },
+//     options: {
+//       responsive: true,
+//       maintainAspectRatio: false,
+//       scales: {
+//         y: {
+//           beginAtZero: true
+//         }
+//       }
+//     }
+//   });
+
+
+// console.log(barChartObj.config.data.datasets[0].data)
+
+const doughdata = {
+  labels: [
+    'Single Family',
+    'Multi Family',
+    'Townhouses'
+  ],
+  datasets: [{
+    label: 'New Dwelling Units Proposed',
+    data: [],
+    backgroundColor: [
+      'rgb(255, 242, 84)',
+      'rgb(255, 197, 64)',
+      'rgb(255, 26, 26)'
+    ],
+  }]
+};
+
+const doughconfig = {
+  type: 'doughnut',
+  data: doughdata,
+  options: {
+    plugins: {
+      title: {
+        display: true,
+        text: 'New Dwelling Units Proposed',
+        position: 'top'
+      },
+      legend: {
+        display: true,
+        position: 'bottom'
       }
-    }
-  }});
+    },
+    responsive: true,
+    maintainAspectRatio: false,
+    tooltips: {
+      displayColors: false
+    },
+  },
+};
+
+var doughCtx = new Chart(document.getElementById('doughChart'), doughconfig)
+//  var xValues = ["Commerical", "Industrial", "Agricultural", "Public Semipublic"];
+//  var yValues = [55, 49, 44, 24];
+//  var barColors = ["red", "green","blue","orange"];
+
+//   new Chart(pieCtx, {
+//     type: "doughnut",
+//     data: {
+//       labels: xValues,
+//       datasets: [{
+//         backgroundColor: barColors,
+//         data: yValues
+//       }]
+//     },
+//     options: {
+//       responsive: true,
+//       maintainAspectRatio: false,
+//       plugins: {
+//         title: {
+//           display: true,
+//           text: 'Non-residential Lots Created',
+//           position: 'bottom',
+//         legend: {
+//           display: false,
+//           position: 'bottom'
+//         }
+//       }
+//     }
+//   }});
 
 var xyValues = [
     {x:50, y:7},
@@ -802,33 +1076,49 @@ new Chart(horizontalBar, {
   });
 
 
-const pieChart2 = document.getElementById('pieChart2_id')
-var xValues = [100,200,300,400,500,600,700,800,900,1000];
-
-new Chart(pieChart2, {
-  type: "line",
-  data: {
-    labels: xValues,
+  const piedata = {
+    labels: [
+      'Commercial',
+      'Industrial',
+      'Agricultural',
+      'Public Semi-Public'
+    ],
     datasets: [{
-      data: [860,1140,1060,1060,1070,1110,1330,2210,7830,2478],
-      borderColor: "red",
-      fill: false
-    },{
-      data: [1600,1700,1700,1900,2000,2700,4000,5000,6000,7000],
-      borderColor: "green",
-      fill: false
-    },{
-      data: [300,700,2000,5000,6000,4000,2000,1000,200,100],
-      borderColor: "blue",
-      fill: false
+      label: 'Non Residential Lots Created',
+      data: [],
+      backgroundColor: [
+        'rgba(255, 0, 0)',
+        'rgba(197, 0, 255)',
+        'rgba(56, 168, 0)',
+        'rgba(203, 201, 204)'
+      ],
     }]
-  },
-  options: {
-    responsive: true,
-    maintainAspectRatio: false,
-    legend: {display: false}
-  }
-});
+  };
+  
+  const pieconfig = {
+    type: 'pie',
+    data: piedata,
+    options: {
+      plugins: {
+        title: {
+          display: true,
+          text: 'Non Residential Lots Created',
+          position: 'top'
+        },
+        legend: {
+          display: true,
+          position: 'bottom'
+        }
+      },
+      responsive: true,
+      maintainAspectRatio: false,
+      tooltips: {
+        displayColors: false
+      },
+    },
+  };
+  
+var pieCtx = new Chart(document.getElementById('pieChart'), pieconfig)
 
 
 var loadScreenTimer = window.setInterval(function () {

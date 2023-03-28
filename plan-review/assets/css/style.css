@@ -310,12 +310,17 @@ input:checked + .slider:before {
   gap: 10px;
 }
 
-.chartContainer.pie {
+.chartContainer.dough {
   z-index: 900;
   opacity: 99%;
 }
 
 .chartContainer.bar {
+  z-index: 900;
+  opacity: 99%;
+}
+
+.chartContainer.pie {
   z-index: 900;
   opacity: 99%;
 }

@@ -71,7 +71,7 @@
               <li><button id="year-filter-btn" class="btn dropdown-item">Filter Plans By Year</button></li>
               <li><button id="multi-year-filter-btn" class="btn dropdown-item">Filter Plans By Multiple Years</button></li>
 			  <li><button id="final-plan-btn" class="btn dropdown-item">Filter Plans By Final Status</button></li>
-              <li><button id="muni-zoom-btn" class="btn dropdown-item">Zoom To Municipality</button></li>
+              <li><button id="muni-zoom-btn" class="btn dropdown-item">Filter and Zoom To Municipality</button></li>
               <li><button id="legend-btn" class="btn dropdown-item">Map Legend</button></li>
               <li><button id="disclaimer-btn" class="btn dropdown-item">Disclaimer</button></li>
           </ul>
@@ -95,14 +95,14 @@
 		<div class="chartContainer bar">
 			<canvas id="barChart"></canvas>
 		</div>
-		<div class="chartContainer pie">
-			<canvas id="pieChart"></canvas>
+		<div class="chartContainer dough">
+			<canvas id="doughChart"></canvas>
 		</div>
 		<div class="chartContainer horizontalBar">
 			<canvas id="horizontalBarChat"></canvas>
 		</div>
-		<div class="chartContainer pieChart2">
-			<canvas id="pieChart2_id"></canvas>
+		<div class="chartContainer pie">
+			<canvas id="pieChart"></canvas>
 		</div>
 	</div>
 	
@@ -300,13 +300,13 @@
 	<div class="modal-dialog" role="document">
 	  <div class="modal-content">
 		<div class="modal-header">
-		  <h5 class="modal-title">Map LegendZoom To Municipality</h5>
+		  <h5 class="modal-title">Zoom To Municipality</h5>
 		  <button type="button" class="close" data-dismiss="modal" aria-label="Close">
 			<span aria-hidden="true">&times;</span>
 		  </button>
 		</div>
 		<div class="modal-body">
-			<p>Select a municipality below to zoom to it:</p>
+			<p>Select a municipality below to filter and zoom to it:</p>
 			<select id="selectMuni" class="form-control">
 				<option value="Default">Select A Municipality</option>
 				<option value="Camp Hill Borough">Camp Hill Borough</option>
@@ -423,6 +423,9 @@
 
 <!-- Chart.js -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<!--Chart.js data label plugin-->
+<script> src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"</script> 
 
 <!-- Map Application -->
 <script src="assets/js/app.js"></script>
