@@ -555,6 +555,42 @@ function getNonResidentialLotsCreated(feature, obj) {
 
 }
 
+function getNonResidentialLotsSqFt(feature, obj) {
+  switch (feature.properties.LANDUSE) {
+    case 1: 
+    // console.log('Residential Lot - SQFT not being counted')
+    break;
+
+    case 2: 
+    // console.log('Lot Addition - SQFT not being counted')
+    break;
+
+    case 3:
+    obj['commercial'] += feature.properties.SQFT;
+    break;
+
+    case 4:
+    obj['industrial'] += feature.properties.SQFT;
+    break;
+
+    // not sure why this works but it does don't change it //
+
+    case 5:
+    obj['agricultural'] += feature.properties.SQFT;
+    break;
+
+    // case 6:
+    // obj['semiPublic'] += 1;
+
+    // case 7:
+    // obj['semiPublic'] += 1;
+    // break;
+
+    default:
+    obj['semiPublic'] += feature.properties.SQFT;
+  }
+}
+
 var count = 0
 
 planSubmissions.on('load', iterateFeatures);
@@ -562,7 +598,8 @@ function iterateFeatures () {
     Object.keys(landTypesObj).forEach((i) => landTypesObj[i] = 0);
     Object.keys(UnitTypeCounts).forEach((i) => UnitTypeCounts[i] = 0);
     Object.keys(nonResidentalLotsCreated).forEach((i) => nonResidentalLotsCreated[i] = 0);
-    console.log(landTypesObj)
+    Object.keys(proposedNonResidentialSqaureFootage).forEach((i) => proposedNonResidentialSqaureFootage[i] = 0);
+    // console.log(landTypesObj)
     count = 0
     planSubmissions.eachActiveFeature(function(layer) {
     count += 1
@@ -570,18 +607,21 @@ function iterateFeatures () {
     push2Array(layer.feature, landTypesObj, landUseTypeArr)
     getUnitTypeCounts(layer.feature, UnitTypeCounts)
     getNonResidentialLotsCreated(layer.feature, nonResidentalLotsCreated)
+    getNonResidentialLotsSqFt(layer.feature, proposedNonResidentialSqaureFootage)
     // getTotalLandUseTypes(landUseTypeArr)
     addData(barChartObj, Object.keys(landTypesObj).map(val => landTypesObj[val]))
     updateDoughChart(doughCtx, Object.keys(UnitTypeCounts).map(val => UnitTypeCounts[val]))
     updatePieChart(pieCtx, Object.keys(nonResidentalLotsCreated).map(val => nonResidentalLotsCreated[val]))
+    updateHorizontalBarChart(horizontalBar, Object.keys(proposedNonResidentialSqaureFootage).map(val => proposedNonResidentialSqaureFootage[val]))
     // console.log(layer.feature.properties.LANDUSE)
-    console.log(layer.feature.properties)
+    // console.log(layer.feature.properties)
     });
-    console.log(count)
-    console.log(landTypesObj)
-    console.log(Object.keys(landTypesObj).map(val => landTypesObj[val]))
-    console.log(UnitTypeCounts)
-    console.log(nonResidentalLotsCreated)
+    // console.log(count)
+    // console.log(landTypesObj)
+    // console.log(Object.keys(landTypesObj).map(val => landTypesObj[val]))
+    // console.log(UnitTypeCounts)
+    // console.log(nonResidentalLotsCreated)
+    // console.log(proposedNonResidentialSqaureFootage)
 }
 
 planSubmissions.bindPopup(function (evt, layer) {
@@ -682,6 +722,11 @@ function updateDoughChart(chart, dataArrDough) {
 
 function updatePieChart(chart, dataArrPie) {
   chart.config.data.datasets[0].data = dataArrPie
+  chart.update();
+}
+
+function updateHorizontalBarChart(chart, dataArrHorizontal) {
+  chart.config.data.datasets[0].data = dataArrHorizontal
   chart.update();
 }
 
@@ -981,8 +1026,14 @@ const doughdata = {
     backgroundColor: [
       'rgb(255, 242, 84)',
       'rgb(255, 197, 64)',
-      'rgb(255, 26, 26)'
+      'rgb(255, 26, 26)',
     ],
+    borderColor: [
+      'rgb(8, 6, 0)',
+      'rgb(8, 6, 0)',
+      'rgb(8, 6, 0)',
+    ],
+    borderWidth: 0.5
   }]
 };
 
@@ -1039,41 +1090,87 @@ var doughCtx = new Chart(document.getElementById('doughChart'), doughconfig)
 //     }
 //   }});
 
-var xyValues = [
-    {x:50, y:7},
-    {x:60, y:8},
-    {x:70, y:8},
-    {x:80, y:9},
-    {x:90, y:9},
-    {x:100, y:9},
-    {x:110, y:10},
-    {x:120, y:11},
-    {x:130, y:14},
-    {x:140, y:14},
-    {x:150, y:15}
-  ];
+// var xyValues = [
+//     {x:50, y:7},
+//     {x:60, y:8},
+//     {x:70, y:8},
+//     {x:80, y:9},
+//     {x:90, y:9},
+//     {x:100, y:9},
+//     {x:110, y:10},
+//     {x:120, y:11},
+//     {x:130, y:14},
+//     {x:140, y:14},
+//     {x:150, y:15}
+//   ];
 
-const horizontalBar = document.getElementById('horizontalBarChat')
-new Chart(horizontalBar, {
-    type: "scatter",
-    data: {
-      datasets: [{
-        pointRadius: 4,
-        pointBackgroundColor: "rgba(0,0,255,1)",
-        data: xyValues
-      }]
+const horizontalBarLabels = ['Commercial', 'Industrial', 'Agricultural', 'Public Semi-Public'];
+const horizontalBarData = {
+  labels: horizontalBarLabels,
+  datasets: [{
+    axis: 'y',
+    data: [],
+    fill: false,
+    backgroundColor: [
+      'rgba(255, 0, 0, 1)',
+      'rgba(197, 0, 255, 1)',
+      'rgba(56, 168, 0, 1)',
+      'rgba(203,201,204, 1)',
+    ],
+    borderColor: [
+      'rgb(8, 6, 0)',
+      'rgb(8, 6, 0)',
+      'rgb(8, 6, 0)',
+      'rgb(8, 6, 0)',
+    ],
+    borderWidth: 1.5
+  }]
+};
+
+const horizontalBarconfig = {
+  type: 'bar',
+  data: horizontalBarData,
+  options: {
+    indexAxis: 'y',
+    elements: {
+      bar: {
+        borderWidth: 1.5,
+      }
     },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: {
-        legend: {
-          display: true,
-          position: 'top'
-        }
+    responsive: true,
+    plugins: {
+      legend: {
+        display: false,
+      },
+      title: {
+        display: true,
+        text: 'Proposed Non-Residential Square Footage'
       }
     }
-  });
+  },
+};
+
+const horizontalBar = new Chart(document.getElementById('horizontalBarChat'), horizontalBarconfig)
+// new Chart(horizontalBar, {
+//     type: "scatter",
+//     data: {
+//       datasets: [{
+//         pointRadius: 4,
+//         pointBackgroundColor: "rgba(0,0,255,1)",
+//         data: xyValues
+//       }]
+//     },
+//     options: {
+//       responsive: true,
+//       maintainAspectRatio: false,
+//       plugins: {
+//         legend: {
+//           display: true,
+//           position: 'top'
+//         }
+//       }
+//     }
+//   });
 
 
   const piedata = {
@@ -1092,6 +1189,13 @@ new Chart(horizontalBar, {
         'rgba(56, 168, 0)',
         'rgba(203, 201, 204)'
       ],
+      borderColor: [
+        'rgb(8, 6, 0)',
+        'rgb(8, 6, 0)',
+        'rgb(8, 6, 0)',
+        'rgb(8, 6, 0)',
+      ],
+      borderWidth: 0.5
     }]
   };
   
