@@ -111,7 +111,8 @@ for (var i = 0; i < targetIds.length; i++) {
 $(document).ready(function () {
   // zoom to muni widget
   $("#selectMuni").on("change", function (e) {
-    zoomToMuni($(this).val());
+    zoomToMuni($(this).val(), muni, planSubmissions, document.getElementById('startDateUI').innerHTML,
+    document.getElementById('endDateUI').innerHTML);
   });
   attachSearch();
   $(window).resize(function () {
@@ -259,26 +260,116 @@ var returnNumberWithCommas = function returnNumberWithCommas(x) {
 }; //  Basemap Changer
 
 
-var zoomToMuni = function zoomToMuni(selectedMuni) {
-  // where clause
-  var whereClause = "MUNI = '".concat(selectedMuni, "'");
-  
-  var query = L.esri.query({
-    url: 'https://services1.arcgis.com/1Cfo0re3un0w6a30/arcgis/rest/services/Municipal_Boundaries/FeatureServer/0'
-  });
-  query.where(whereClause).bounds(function (error, latLngBounds, response) {
-    if (error) {
-      // add message to console
-      console.warn('An error with the query request has occured');
-      console.warn("Code: ".concat(error.code, "; Message: ").concat(error.message)); // set content of results element
-    } else if (response.features < 1) {
-      // add message to console
-      console.log('No features selected'); // set content of results element
-    } else {
-      map.fitBounds(latLngBounds);
-    }
-  }); // close basemap modal
+var muniCoords = {
 
+}
+
+var matchedDatePlanIds = {
+   ids: []
+}
+
+var DateFrom, DateTo, CheckDate
+
+
+var muni = L.esri.featureLayer({
+  url: 'https://services1.arcgis.com/1Cfo0re3un0w6a30/arcgis/rest/services/Municipal_Boundaries/FeatureServer/0',
+  onEachFeature: function getmuniCoords(feature, layer) {
+    // console.log(layer)
+    muniCoords[feature.properties.MUNI] = feature.geometry.coordinates
+  }})
+
+// var coords = []
+var reversedCoords = []
+var zoomToMuni = function zoomToMuni(selectedMuni, featureLayer, planSubs, dateFrom, dateTo) {
+
+  DateFrom = dateFrom
+  DateTo = dateTo
+  
+  var D1 = new Date(DateFrom)
+  var D2 = new Date(DateTo)
+ 
+
+  // where clause
+  console.log(selectedMuni)
+  console.log(dateFrom, dateTo)
+  var whereClause = "MUNI = '".concat(selectedMuni, "'");
+
+  featureLayer.query()
+  .where("MUNI = '".concat(selectedMuni, "'"))
+  .run(function(error, featureCollection) {
+    var coords = featureCollection.features[0].geometry.coordinates[0]
+    // console.log(featureCollection.features[0].geometry.coordinates[0])
+    coords.forEach(function(coord) {
+      console.log(coord)
+      reversedCoords.push([coord[1], coord[0]])
+    })
+    // var geoJ = L.GeoJSON.coordsToLatLng(coords).addTo(map);
+    var matchedIDs = []
+    console.log(reversedCoords)
+    var poly = L.polygon(reversedCoords);
+    planSubs
+    .query()
+    .between(dateFrom, dateTo)
+    .intersects(poly)
+    .run(function(error, featureCollection, response) {
+      console.log(response)
+      response.features.forEach(feature => {
+        var D3 = new Date(convertJSONDateToString(feature.properties.DATE))
+        if (D3.getTime() <= D2.getTime()
+        && D3.getTime() >= D1.getTime()) {
+          // console.log('date is within range')
+          matchedDatePlanIds.ids.push(feature.id)
+          console.log(feature.id)
+        } else {
+          // console.log('date is not within range')
+        }
+        // console.log(convertJSONDateToString(feature.properties.DATE))
+      })
+    })
+    // console.log(`this is a poly object ${poly.feature}`)
+    map.fitBounds(poly.getBounds());
+    planSubs.setWhere("OBJECTID IN (" + matchedDatePlanIds.ids.join(",") + ")");
+    planSubs.refresh();
+    console.log(matchedDatePlanIds)
+    coords.length = 0
+    reversedCoords.length = 0
+    // matchedDatePlanIds.ids.length = 0
+  });
+  
+  // var query = L.esri.query({
+  //   url: 'https://services1.arcgis.com/1Cfo0re3un0w6a30/arcgis/rest/services/Municipal_Boundaries/FeatureServer/0'
+
+  // });
+
+  // coords.length = 0
+  // muni.setWhere(whereClause)
+  // muni.refresh()
+  // muni.on('load', function() {
+  //   muni.eachActiveFeature(function(layer) {
+  //     console.log(layer.feature)
+  //     coords.push(layer.feature.geometry.coordinates)
+
+  //   })
+  //   console.log(coords[0])
+  // });
+
+  // query.where(whereClause).bounds(function (error, latLngBounds, response) {
+  //   if (error) {
+  //     // add message to console
+  //     console.warn('An error with the query request has occured');
+  //     console.warn("Code: ".concat(error.code, "; Message: ").concat(error.message)); // set content of results element
+  //   } else if (response.features < 1) {
+  //     // add message to console
+  //     console.log('No features selected'); // set content of results element
+  //   } else {
+  //     // console.log(query.toGeoJSON)
+  //     // console.log(latLngBounds)
+  //     map.fitBounds(latLngBounds);
+  //   }
+  // });
+  
+  
+  // close basemap modal
   $('#muniZoomModal').modal('hide');
 }; // function to handle load event for map services
 
@@ -381,6 +472,10 @@ var zoomHomeControl = L.Control.zoomHome({
 var fullscreenControl = new L.Control.Fullscreen({
   position: 'topleft'
 }).addTo(map);
+
+map.on('click', function() {
+  console.log(document.getElementById('startDateUI'), document.getElementById('endDateUI'), muni.getWhere(), muniCoords)
+})
 
 //  
 
@@ -670,7 +765,7 @@ planSubmissions.bindPopup(function (evt, layer) {
   maxWidth: setPopupMaxWidth(windowWidth)
 }); // array of map services to run loading function on
 
-var mapServices = [imagery2020, roadsMunicipality, planSubmissions]; // call load/error events function on layers
+var mapServices = [imagery2020, roadsMunicipality, planSubmissions, muni]; // call load/error events function on layers
 
 mapServices.forEach(function (element) {
   return processLoadEvent(element);
